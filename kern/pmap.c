@@ -26,7 +26,7 @@ static struct PageInfo *page_free_list;	// Free list of physical pages
 static int
 nvram_read(int r)
 {
-	return mc146818_read(r) | (mc146818_read(r + 1) << 8);
+	return mc146818_read(r) | (mc146818_read(r + 1) << 8);  // mc146818_read -- 读取CMOS中存储的内存信息，见(kclock.c)
 }
 
 static void
@@ -36,13 +36,13 @@ i386_detect_memory(void)
 
 	// Use CMOS calls to measure available base & extended memory.
 	// (CMOS calls return results in kilobytes.)
-	npages_basemem = (nvram_read(NVRAM_BASELO) * 1024) / PGSIZE;
-	npages_extmem = (nvram_read(NVRAM_EXTLO) * 1024) / PGSIZE;
+	npages_basemem = (nvram_read(NVRAM_BASELO) * 1024) / PGSIZE;  // NVRAM_BASELO = 0x15,表示CMOS地址 (见kclock.h)
+	npages_extmem = (nvram_read(NVRAM_EXTLO) * 1024) / PGSIZE;  // NVRAM_EXTLO = 0x17
 
 	// Calculate the number of physical pages available in both base
 	// and extended memory.
 	if (npages_extmem)
-		npages = (EXTPHYSMEM / PGSIZE) + npages_extmem;
+		npages = (EXTPHYSMEM / PGSIZE) + npages_extmem;  // #define EXTPHYSMEM	0x100000 (memlayout.h)
 	else
 		npages = npages_basemem;
 
