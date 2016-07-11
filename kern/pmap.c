@@ -90,7 +90,7 @@ boot_alloc(uint32_t n)
 	// to any kernel code or global variables.
 	if (!nextfree) {
 		extern char end[];
-		nextfree = ROUNDUP((char *) end, PGSIZE);
+		nextfree = ROUNDUP((char *) end, PGSIZE);  //  ROUNDUP(a, n)　四舍五入到最接近n的倍数，即4k对齐
 	}
 
 	// Allocate a chunk large enough to hold 'n' bytes, then update
@@ -99,7 +99,10 @@ boot_alloc(uint32_t n)
 	//
 	// LAB 2: Your code here.
 
-	return NULL;
+    result = nextfree;
+	nextfree += ROUNDUP(n, PGSIZE);	
+	
+	return result;
 }
 
 // Set up a two-level page table:
@@ -145,6 +148,8 @@ mem_init(void)
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
 
+    //　创建数组存储所有的PageInfo，并为数组分配内存。
+    pages = (struct PageInfo*) boot_alloc(npages * sizeof(struct PageInfo));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -247,11 +252,25 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+
+	//　IDT(Interrupt Descriptor Table) 终端描述表
 	size_t i;
+	page_free_list = null;
 	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+		if(i == 0) {
+			pages[0].pp_ref = 1;
+			pages.pp_link = null;
+		}
+		else if(i >= npages_basemen && i < ((uint32_t)boot_alloc(0) - KERNBASE)) >> 12) {
+            pages[i].pp_ref = 1;
+            pages[i].pp_link = page_free_list;
+			page_free_list = &pages[i];
+		}
+		else {
+			pages[i] = 0;
+			pages.pp_ref = page_free_list;
+			page_free_list = &pages[i];
+		}
 	}
 }
 
@@ -271,7 +290,22 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
-	return 0;
+
+    struct PageInfo* result;
+
+	if(page_free_list == NULL) {
+		return NULL;
+	}
+
+	result = page_free_list;
+	page_free_list = result->pp_link;
+	result->pp_link = NULL;
+    
+	if(alloc_flags & ALLOC_ZERO) {
+		memset(page2kva(result), 0, PGSIZE);  // 内存初始化'\0'
+	}
+
+	return result;
 }
 
 //
@@ -284,6 +318,10 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+    
+	assert(pp->pp_ref == 0 || pp->pp_link == NULL);
+	pp->pp_link = page_free_list;
+	page_free_list = pp;
 }
 
 //
